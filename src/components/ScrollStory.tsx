@@ -37,11 +37,12 @@ export function ScrollStory() {
   });
 
   // Soft spring inertia smooths mouse-wheel bursts into a continuous glide.
+  // Extra-low restDelta lets it settle precisely without micro-jitter.
   const smooth = useSpring(scrollYProgress, {
-    stiffness: 50,
-    damping: 20,
-    mass: 0.5,
-    restDelta: 0.001,
+    stiffness: 45,
+    damping: 25,
+    mass: 0.4,
+    restDelta: 0.0001,
   });
 
   // Drive the video from the smoothed scroll every frame.

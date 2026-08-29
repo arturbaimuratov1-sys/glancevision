@@ -27,9 +27,9 @@ export function GlareCard({
   const springY = useSpring(mouseY, { stiffness: 160, damping: 20, mass: 0.4 });
 
   // Radial glare that follows the cursor.
-  const glare = useMotionTemplate`radial-gradient(120px circle at ${springX}px ${springY}px, rgba(255,255,255,0.12), transparent 70%)`;
+  const glare = useMotionTemplate`radial-gradient(140px circle at ${springX}px ${springY}px, rgba(255,255,255,0.16), transparent 70%)`;
   // Edge highlight drawn around the cursor for a "light catches the glass" feel.
-  const glow = useMotionTemplate`radial-gradient(220px circle at ${springX}px ${springY}px, rgba(255,255,255,0.09), transparent 70%)`;
+  const glow = useMotionTemplate`radial-gradient(240px circle at ${springX}px ${springY}px, rgba(255,255,255,0.1), transparent 70%)`;
 
   const onMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     const rect = ref.current?.getBoundingClientRect();
@@ -46,7 +46,7 @@ export function GlareCard({
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, amount: 0.2 }}
       transition={{ duration: 0.7, delay, ease: [0.22, 1, 0.36, 1] }}
-      className={`group relative overflow-hidden rounded-3xl border border-white/10 bg-white/5 backdrop-blur-3xl ${className}`}
+      className={`group relative overflow-hidden rounded-3xl border border-white/10 bg-white/[0.04] backdrop-blur-3xl ${className}`}
     >
       {/* Cursor edge glow */}
       <motion.div
@@ -60,8 +60,15 @@ export function GlareCard({
         className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100"
         style={{ background: glare }}
       />
+      {/* Ambient diagonal sheen — always-on gloss so cards never read flat */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 bg-[linear-gradient(115deg,transparent_30%,rgba(255,255,255,0.07)_45%,rgba(255,255,255,0.02)_55%,transparent_70%)]"
+      />
       {/* top highlight line */}
       <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/30 to-transparent" />
+      {/* bottom soft inner edge */}
+      <div className="pointer-events-none absolute inset-x-4 bottom-0 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
 
       <div className="relative">{children}</div>
     </motion.div>
