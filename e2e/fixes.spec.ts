@@ -18,14 +18,13 @@ test.describe("Video-scrub + glass fixes", () => {
     await page.goto("/", { waitUntil: "networkidle" });
   });
 
-  test("1. video exists, bottom layer, visible", async () => {
+  test("1. video exists, positioned as the hero layer, visible", async () => {
     const video = page.getByTestId("scrub-video");
     await expect(video).toBeVisible();
 
     const meta = await video.evaluate((v: HTMLVideoElement) => {
       const cs = getComputedStyle(v);
       return {
-        zIndex: Number(cs.zIndex),
         position: cs.position,
         objectFit: cs.objectFit,
         muted: v.muted,
@@ -34,14 +33,19 @@ test.describe("Video-scrub + glass fixes", () => {
         ready: v.readyState,
       };
     });
-    // z-index must be negative (bottom-most), fixed, object-cover, muted/inline.
-    expect(meta.zIndex).toBeLessThan(0);
-    expect(meta.position).toBe("fixed");
+    // The video is absolute within the sticky hero viewport, object-cover,
+    // muted/playsinline/preload-auto, and actually decoded.
+    expect(meta.position).toBe("absolute");
     expect(meta.objectFit).toBe("cover");
     expect(meta.muted).toBe(true);
     expect(meta.playsInline).toBe(true);
     expect(meta.preload).toBe("auto");
     expect(meta.ready).toBeGreaterThanOrEqual(2);
+
+    // It must sit behind the content layers (z-index 0 or lower) — but the
+    // hero headline overlaps it, so it must NOT be the top layer.
+    const z = await video.evaluate((v) => Number(getComputedStyle(v).zIndex));
+    expect(z).toBeLessThanOrEqual(0);
   });
 
   test("2. 'Look classic' fades to 0 on scroll", async () => {

@@ -14,21 +14,26 @@ import { VIDEO_URL, PRODUCT } from "@/lib/config";
 /**
  * Cinematic video-scrub hero (Apple-style).
  *
- * The glasses footage (glance-vision.mp4, ~9.5 s) is bound to scroll. It sits
- * on the very bottom layer (`z-[-1]`, fixed) so the whole interface above it
- * is translucent glass and the footage shows through.
+ * The glasses footage (glance-vision.mp4, ~9.5 s) is bound to scroll.
+ * Architecture (robust, static-export friendly):
+ *   - hero container     : h-[300vh]  (scroll space)
+ *   - sticky viewport    : sticky top-0 h-screen w-full overflow-hidden
+ *   - <video>            : absolute inset-0 w-full h-full object-cover z-0
+ *                         (a plain DOM element, driven via ref — no motion)
  *
- *   video 0.00–0.65  frontal glasses -> 3/4 turn
- *   video 0.65–1.00  camera flies into the lenses (clean screen, no HUD)
- *
- * scrollYProgress is wrapped in a useSpring so seeking currentTime is smooth
- * instead of bursting. The video stays paused; the rAF loop only seeks.
+ * video.currentTime is scrubbed from scrollYProgress wrapped in a spring.
+ * The video stays paused; an rAF loop seeks it directly. All mutable state
+ * lives in refs so there are zero re-renders during scroll, and duration is
+ * read live from the element (NaN-safe) so the loop never breaks.
  */
+
+// Safe duration: video.duration is NaN until metadata loads.
+const SAFE_DURATION = 9.5;
+
 export function ScrollStory() {
   const containerRef = useRef<HTMLElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const scrubTarget = useRef(0);
-  const [videoDuration, setVideoDuration] = useState(9.5);
   const [videoReady, setVideoReady] = useState(false);
 
   const { scrollYProgress } = useScroll({
@@ -36,50 +41,48 @@ export function ScrollStory() {
     offset: ["start start", "end end"],
   });
 
-  // Soft spring inertia smooths mouse-wheel bursts into a continuous glide.
-  // Extra-low restDelta lets it settle precisely without micro-jitter.
+  // Spring inertia smooths mouse-wheel bursts into a continuous glide.
   const smooth = useSpring(scrollYProgress, {
-    stiffness: 45,
-    damping: 25,
-    mass: 0.4,
-    restDelta: 0.0001,
+    stiffness: 100,
+    damping: 30,
+    restDelta: 0.001,
   });
 
-  // Drive the video from the smoothed scroll every frame.
+  // Drive the video target from the smoothed scroll every frame (ref only).
   useMotionValueEvent(smooth, "change", (v) => {
-    scrubTarget.current = v * videoDuration;
+    if (Number.isFinite(v)) scrubTarget.current = v;
   });
 
-  // Scrub loop: the video stays PAUSED; we only seek `currentTime` toward the
-  // scroll target, reading the live spring value each frame. No React state,
-  // no re-renders during scroll — just a direct DOM seek, which is what keeps
-  // the scrub at zero lag.
+  // Hero copy + hint fade out as soon as the user starts scrolling.
+  const heroFade = useTransform(smooth, [0, 0.28], [1, 0]);
+
+  // Scrub loop: read the live target + duration each frame, seek directly.
+  // No React state, no re-renders — pure DOM seek, which is NaN-safe.
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
 
     let raf = 0;
-    let lastApplied = -1;
+    let lastTarget = -1;
 
     const tick = () => {
       raf = requestAnimationFrame(tick);
-      const target = scrubTarget.current;
-      const cur = video.currentTime;
-      const diff = target - cur;
-      if (Math.abs(diff) < 0.008) {
-        lastApplied = -1;
-        return;
-      }
-      // Seek directly (browsers coalesce seeks per frame) for buttery scrub.
+
+      const duration =
+        Number.isFinite(video.duration) && video.duration > 0
+          ? video.duration
+          : SAFE_DURATION;
+      const target = Math.max(0, Math.min(duration - 0.01, scrubTarget.current));
+
+      // Hystereis: skip a seek if we're already there to avoid churn.
+      if (Math.abs(target - lastTarget) < 0.004) return;
+      lastTarget = target;
+
       if (video.readyState >= 2) {
-        const next = Math.max(0, Math.min(video.duration - 0.01, target));
-        if (Math.abs(next - lastApplied) > 0.001) {
-          try {
-            video.currentTime = next;
-            lastApplied = next;
-          } catch {
-            /* seek can throw while metadata loads — ignore, retry next frame */
-          }
+        try {
+          video.currentTime = target;
+        } catch {
+          /* seek can throw while metadata loads — ignore, retry next frame */
         }
       }
     };
@@ -93,15 +96,18 @@ export function ScrollStory() {
         /* ignore */
       }
     };
-  }, [videoReady]);
+  }, []);
 
-  // Pause the video on load so scrubbing controls it entirely.
+  // On load, pause + park the video so scrubbing fully owns playback.
   const handleLoadedMetadata = useCallback(() => {
     const video = videoRef.current;
     if (!video) return;
-    setVideoDuration(video.duration || 9.5);
     video.pause();
-    video.currentTime = 0.001;
+    try {
+      video.currentTime = 0.001;
+    } catch {
+      /* ignore */
+    }
     setVideoReady(true);
   }, []);
 
@@ -114,7 +120,6 @@ export function ScrollStory() {
     const check = () => {
       if (cancelled) return;
       if (video.readyState >= 2) {
-        setVideoDuration(video.duration || 9.5);
         setVideoReady(true);
       } else {
         setTimeout(check, 120);
@@ -126,34 +131,28 @@ export function ScrollStory() {
     };
   }, []);
 
-  // Hero copy + hint fade out as soon as the user starts scrolling.
-  const heroFade = useTransform(smooth, [0, 0.28], [1, 0]);
-
   return (
-    <section id="overview" ref={containerRef} className="relative h-[420vh]">
+    <section id="overview" ref={containerRef} className="relative h-[300vh]">
       <div className="sticky top-0 h-screen w-full overflow-hidden">
-        {/* Fixed cinematic video — the bottom-most layer, scrubbed by scroll */}
-        <motion.video
+        {/* Cinematic video — scrubbed by scroll. Plain element, ref-driven. */}
+        <video
           ref={videoRef}
           data-testid="scrub-video"
-          className="fixed inset-0 -z-10 h-full w-full object-cover"
+          className="absolute inset-0 z-0 h-full w-full object-cover"
           src={VIDEO_URL}
           muted
           playsInline
           loop={false}
           preload="auto"
           disablePictureInPicture
-          style={{ pointerEvents: "none" }}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: videoReady ? 1 : 0 }}
-          transition={{ duration: 1.1, ease: [0.22, 1, 0.36, 1] }}
+          style={{ pointerEvents: "none", opacity: videoReady ? 1 : 0 }}
           onLoadedMetadata={handleLoadedMetadata}
           onCanPlay={() => setVideoReady(true)}
         />
 
         {/* Loading veil while the video decodes — auto fades with the video */}
         {!videoReady && (
-          <div className="pointer-events-none fixed inset-0 flex flex-col items-center justify-center gap-4 bg-black/80">
+          <div className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center gap-4 bg-black/80">
             <motion.div
               className="h-9 w-9 rounded-full border-2 border-white/15 border-t-white/90"
               animate={{ rotate: 360 }}
@@ -169,7 +168,7 @@ export function ScrollStory() {
         )}
 
         {/* Ambient frosted-glass orbs (subtle, keeps footage visible) */}
-        <div className="pointer-events-none fixed inset-0">
+        <div className="pointer-events-none absolute inset-0 z-[1]">
           <FrostedBackdrop />
         </div>
 

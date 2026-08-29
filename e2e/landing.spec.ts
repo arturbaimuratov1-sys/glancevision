@@ -49,16 +49,16 @@ test.describe("Glance Vision One video-scrub landing", () => {
     expect(meta.duration).toBeGreaterThan(1);
     expect(meta.allowed).toBe(true);
 
-    // Forward scrub with the mouse wheel.
+    // Forward scrub with the mouse wheel (small deltas, ~0.4 of the story).
     const t0 = await video.evaluate((v: HTMLVideoElement) => v.currentTime);
-    await wheel(page, 900, 2, 1500);
+    await wheel(page, 400, 2, 1500);
     const t1 = await video.evaluate((v: HTMLVideoElement) => v.currentTime);
     expect(t1).toBeGreaterThan(t0 + 0.5);
 
     // Deeper into the lens: video keeps advancing (or clamps at end).
     await scrollStoryFraction(page, 0.9);
     const t2 = await video.evaluate((v: HTMLVideoElement) => v.currentTime);
-    expect(t2).toBeGreaterThanOrEqual(t1 - 0.01);
+    expect(t2).toBeGreaterThan(t1 - 0.01);
 
     // Rewind by scrolling back up.
     await scrollStoryFraction(page, 0.2);

@@ -44,10 +44,15 @@ npm run dev        # → http://localhost:3000
 
 ## 🎬 The hero: cinematic video scrubbing
 
-`/public/video/glance-vision.mp4` (~9.5 s H.264) is pinned to the bottom layer:
+`/public/video/glance-vision.mp4` (~9.5 s H.264) is scrubbed by scroll:
 
-- `<video>` is `fixed inset-0 -z-10 object-cover`, muted, playsinline, no controls.
-- `video.currentTime` follows the `scrollYProgress` of the 420vh story section via a `requestAnimationFrame` loop that seeks a **paused** video (browsers coalesce seeks per frame — zero-lag).
+- The hero is a **300vh** story container with a `sticky top-0 h-screen`
+  viewport; the `<video>` is `absolute inset-0 object-cover`, muted,
+  playsinline, no controls — a plain DOM element driven via ref.
+- `video.currentTime` follows the `scrollYProgress` of the story wrapped in a
+  `useSpring`. An rAF loop seeks the **paused** video directly (browsers
+  coalesce seeks per frame — zero-lag). All mutable state lives in refs, so
+  there are no re-renders during scroll.
 - Scrub mapping: frontal glasses → 3/4 turn → camera flies into the lenses.
 - The hero headline fades out immediately on scroll (`opacity 1 → 0`).
 
