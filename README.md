@@ -46,7 +46,7 @@ npm run dev        # → http://localhost:3000
 
 `/public/video/glance-vision.mp4` (~9.5 s H.264) is scrubbed by scroll:
 
-- The hero is a **300vh** story container with a `sticky top-0 h-screen`
+- The hero is a **450vh** story container with a `sticky top-0 h-screen`
   viewport; the `<video>` is `absolute inset-0 object-cover`, muted,
   playsinline, no controls — a plain DOM element driven via ref.
 - `video.currentTime` follows the `scrollYProgress` of the story wrapped in a

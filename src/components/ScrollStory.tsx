@@ -16,7 +16,7 @@ import { VIDEO_URL, PRODUCT } from "@/lib/config";
  *
  * The glasses footage (glance-vision.mp4, ~9.5 s) is bound to scroll.
  * Architecture (robust, static-export friendly):
- *   - hero container     : h-[300vh]  (scroll space)
+ *   - hero container     : h-[450vh]  (lots of scroll space for all frames)
  *   - sticky viewport    : sticky top-0 h-screen w-full overflow-hidden
  *   - <video>            : absolute inset-0 w-full h-full object-cover z-0
  *                         (a plain DOM element, driven via ref — no motion)
@@ -31,13 +31,13 @@ import { VIDEO_URL, PRODUCT } from "@/lib/config";
 const SAFE_DURATION = 9.5;
 
 export function ScrollStory() {
-  const containerRef = useRef<HTMLElement>(null);
+  const targetRef = useRef<HTMLElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const scrubTarget = useRef(0);
   const [videoReady, setVideoReady] = useState(false);
 
   const { scrollYProgress } = useScroll({
-    target: containerRef,
+    target: targetRef,
     offset: ["start start", "end end"],
   });
 
@@ -132,7 +132,7 @@ export function ScrollStory() {
   }, []);
 
   return (
-    <section id="overview" ref={containerRef} className="relative h-[300vh]">
+    <section id="overview" ref={targetRef} className="relative h-[450vh]">
       <div className="sticky top-0 h-screen w-full overflow-hidden">
         {/* Cinematic video — scrubbed by scroll. Plain element, ref-driven. */}
         <video
